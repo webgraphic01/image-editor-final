@@ -8,163 +8,196 @@ document.addEventListener('DOMContentLoaded', function() {
     const imageUploadInput = getEl('imageUpload');
     const generateBtn = getEl('generate-btn');
     const toolList = document.querySelector('.tool-list');
-    const layerListContainer = getEl('layer-list-container');
-    const promptTabs = getEl('prompt-tabs');
-    const promptControlsContainer = getEl('prompt-controls-container');
+    const promptInput = getEl('prompt-input');
 
-    // --- STATE & ASSETS ---
-    let state = { activeTool: 'brush', image: null, imageContainer: null, layers: [], history: [], historyIndex: -1, activeLayerId: null, isDrawing: false, isMaskDrawn: false, zoomLevel: 1 };
-    
-    const PROMPT_DATA = {
-        materials: { id: 'materials-select', label: 'Edit Materials', icon: 'fa-layer-group', options: { 'pine': 'fa-tree', 'oak': 'fa-tree', 'walnut': 'fa-tree', 'marble': 'fa-gem', 'granite': 'fa-gem', 'limestone': 'fa-mound', 'leather': 'fa-file-leather', 'fabrics': 'fa-shirt', 'carpet': 'fa-rug', 'paint': 'fa-fill-drip', 'plaster': 'fa-helmet-safety', 'wallpaper': 'fa-fan', 'brick': 'fa-brick-wall', 'unglazed-tiles': 'fa-table-cells', 'glazed-tiles': 'fa-table-cells-large', 'mirror': 'fa-mirror', 'clear-glass': 'fa-bottle-water', 'frosted-glass': 'fa-bottle-droplet', 'steel': 'fa-industry', 'bronze': 'fa-medal', 'aluminum': 'fa-medal', 'polished-concrete': 'fa-road', 'exposed-concrete': 'fa-building', 'stone-veneer': 'fa-house-chimney-window' } },
-        categories: {
-            interior: [
-                { id: 'int-furniture-select', label: 'Furniture', options: { 'sofa': 'fa-couch', 'table': 'fa-table', 'chair': 'fa-chair', 'cabinet': 'fa-box-archive', 'shelves': 'fa-book-open-reader', 'kitchen-island': 'fa-kitchen-set', 'desk': 'fa-desktop', 'bed': 'fa-bed' } },
-                { id: 'int-decoration-select', label: 'Decoration', options: { 'painting': 'fa-image', 'wall-clock': 'fa-clock', 'book': 'fa-book-atlas', 'bottle': 'fa-wine-bottle', 'fruit': 'fa-lemon', 'potted-plant': 'fa-plant-wilt', 'vase-with-flower': 'fa-fan', 'lamp': 'fa-lightbulb' } },
-                { id: 'int-creature-select', label: 'Creature', options: { 'child': 'fa-child', 'standing-man': 'fa-person', 'sitting-man': 'fa-person-praying', 'standing-woman': 'fa-person-dress', 'sitting-woman': 'fa-person-praying', 'dog': 'fa-dog', 'cat': 'fa-cat' } }
-            ],
-            exterior: [
-                { id: 'ext-landscape-select', label: 'Street Landscape', options: { 'tree': 'fa-tree', 'bush': 'fa-leaf', 'potted-plant': 'fa-plant-wilt', 'flower': 'fa-fan', 'grass': 'fa-seedling', 'bunch-of-rocks': 'fa-mound', 'pond': 'fa-water' } },
-                { id: 'ext-furniture-select', label: 'Street Furniture', options: { 'car': 'fa-car', 'scooter': 'fa-motorcycle', 'bicycle': 'fa-bicycle', 'a-urban-tree': 'fa-tree', 'a-urban-seating-unit': 'fa-chair', 'a-public-bench': 'fa-chair', 'a-picnic-table': 'fa-table', 'a-street-lamp': 'fa-lightbulb', 'a-public-sculpture': 'fa-monument', 'a-water-fountain': 'fa-faucet-drip' } },
-                { id: 'ext-creature-select', label: 'Street Creature', options: { 'one-people': 'fa-person', 'one-child': 'fa-child', 'one-old-people': 'fa-person-cane', 'one-sitting-people-on-an-object': 'fa-person-praying', 'a-group-of-people': 'fa-users', 'dog': 'fa-dog', 'cat': 'fa-cat', 'bird': 'fa-dove' } }
-            ]
-        },
-        interiorTypes: { id: 'interior-type-select', label: 'Interior Type Options', icon: 'fa-house-chimney', options: { 'Living Room':'fa-couch', 'Kitchen':'fa-kitchen-set', 'Bedroom':'fa-bed', 'Dining Room':'fa-utensils', 'Study Room':'fa-book', 'Home Office':'fa-briefcase', 'Gaming Room':'fa-gamepad', 'House Exterior':'fa-house-chimney-window', 'Outdoor Pool Area':'fa-person-swimming', 'Outdoor Patio':'fa-chair', 'Outdoor Garden':'fa-seedling', 'Meeting Room':'fa-users', 'Workshop':'fa-screwdriver-wrench', 'Fitness Gym':'fa-dumbbell', 'Coffee Shop':'fa-mug-saucer', 'Clothing Store':'fa-shirt', 'Walk-in Closet':'fa-person-booth', 'Restaurant':'fa-utensils', 'Office':'fa-building', 'Coworking Space':'fa-laptop-file', 'Hotel Lobby':'fa-bell-concierge', 'Hotel Room':'fa-bed', 'Hotel Bathroom':'fa-bath', 'Exhibition Space':'fa-image', 'Onsen':'fa-hot-tub-person', 'Mudroom':'fa-shoe-prints' } },
-        stagingTypes: { id: 'staging-type-select', label: 'Staging Types', icon: 'fa-house-user', options: { 'Living Room':'fa-couch', 'Dining Room':'fa-utensils', 'Kitchen':'fa-kitchen-set', 'Bedroom':'fa-bed', 'Bathroom':'fa-bath', 'Office':'fa-briefcase', 'Meeting Room':'fa-users', 'Restaurant':'fa-utensils' } },
-        stagingStyles: { id: 'staging-style-select', label: 'Staging Styles', icon: 'fa-wand-magic', options: { 'Modern':'fa-cube', 'Scandinavian':'fa-snowflake', 'Mediterranean':'fa-lemon', 'Industrial':'fa-industry', 'American Vintage':'fa-camera-retro', 'Neo-Classical':'fa-landmark-dome', 'Luxury':'fa-gem', 'Futuristic':'fa-rocket' } },
-        interiorStyles: { id: 'interior-style-select', label: 'Interior Style Options', icon: 'fa-wand-magic-sparkles', options: { 'No Style':'fa-ban', 'Minimalist Haven':'fa-square', 'Modern Fusion':'fa-cube', 'Contemporary Elegance':'fa-feather-pointed', 'Industrial Loft':'fa-industry', 'Bohemian Oasis':'fa-feather', 'Coastal Breeze':'fa-water', 'Desert Retreat':'fa-sun', 'Mountain Escape':'fa-mountain', 'Victorian Elegance':'fa-chess-queen', 'Art Deco Glamour':'fa-martini-glass-citrus', 'Mid-Century Modern':'fa-tv', 'French Country Charm':'fa-wine-bottle', 'Colonial Classic':'fa-landmark-dome', 'Scandinavian Sanctuary':'fa-snowflake', 'Japanese Zen':'fa-torii-gate', 'Moroccan Mystique':'fa-star-and-crescent', 'Mediterranean Retreat':'fa-lemon', 'Indian Exuberance':'fa-om', 'Traveler\'s Trove':'fa-compass', 'Cyber Eclectic Fusion':'fa-robot', 'Neon Noir':'fa-lightbulb', 'Techno Wonderland':'fa-satellite-dish', 'Retro Futurism':'fa-rocket', 'Digital Zen':'fa-spa', 'Rustic':'fa-tree', 'Vintage':'fa-camera-retro', 'Shabby Chic':'fa-chair' } },
-        interiorColors: { id: 'interior-color-select', label: 'Interior Color Options', icon: 'fa-palette', options: { 'warm-earth-tones':'fa-temperature-high', 'historical-romance':'fa-scroll', 'laid-back-blues':'fa-water', 'palm-springs-modern':'fa-sun', 'sweet-pastels':'fa-ice-cream', 'rich-jewel-tones':'fa-gem', 'desert-chic':'fa-mound', 'forest-inspired':'fa-tree', 'high-contrast-neutrals':'fa-circle-half-stroke', 'airy-neutrals':'fa-feather-light', 'coastal-neutrals':'fa-water', 'eclectic-boho':'fa-hat-cowboy' } },
-        architecturalMaterials: { id: 'arch-mat-select', label: 'Architectural Materials', icon: 'fa-building', options: { 'concrete':'fa-helmet-safety', 'steel':'fa-industry', 'glass':'fa-bottle-water', 'wood':'fa-tree', 'stone':'fa-mound', 'brick':'fa-brick-wall', 'bamboo':'fa-leaf', 'clay':'fa-paint-roller', 'gypsum':'fa-gem', 'plastic':'fa-box' } }
+    // --- STATE MANAGEMENT ---
+    let state = {
+        activeTool: 'brush',
+        image: null,
+        imageContainer: null,
+        baseCanvas: null, // Holds the main image content
+        drawCanvas: null, // For user interaction (masks, etc.)
+        drawCtx: null,
+        isDrawing: false,
+        isMaskDrawn: false,
+        apiKey: null,
+        history: [],
+        historyIndex: -1
     };
-    
+
     // --- INITIALIZATION ---
     getEl('upload-btn')?.addEventListener('click', () => imageUploadInput.click());
     imageUploadInput.addEventListener('change', handleImageUpload);
     toolList.addEventListener('click', handleToolChange);
-    generateBtn.addEventListener('click', () => handleGeneration());
-    promptTabs.addEventListener('click', handleTabSwitch);
+    generateBtn.addEventListener('click', handleGeneration);
+    promptInput.addEventListener('input', updateGenerateButtonState);
     document.addEventListener('keydown', handleKeyboardShortcuts);
-    document.addEventListener("click", (e) => { if (!e.target.matches('.select-selected')) closeAllSelect(); });
-    
-    // --- UI LOGIC ---
-    function renderPromptControls(mode) {
-        promptControlsContainer.innerHTML = '';
-        promptControlsContainer.oninput = updateGenerateButtonState;
-        if (mode === 'add') {
-            const createSection = (data) => {
-                createHeading(promptControlsContainer, data.icon, data.label);
-                createCustomDropdown(data, updateGenerateButtonState, promptControlsContainer);
-            };
-            createSection(PROMPT_DATA.materials);
-            createHeading(promptControlsContainer, 'fa-box', 'Edit Object Categories');
-            createCustomDropdown({ id: 'category-type', options: {'Select...': 'fa-question-circle', 'interior': 'fa-house-chimney', 'exterior': 'fa-road'} }, handleCategoryChange, promptControlsContainer, "Select Category...");
-            const namesContainer = document.createElement('div');
-            namesContainer.id = 'object-names-container';
-            promptControlsContainer.appendChild(namesContainer);
-            createSection(PROMPT_DATA.interiorTypes);
-            createSection(PROMPT_DATA.stagingTypes);
-            createSection(PROMPT_DATA.stagingStyles);
-            createSection(PROMPT_DATA.interiorStyles);
-            createSection(PROMPT_DATA.interiorColors);
-            createSection(PROMPT_DATA.architecturalMaterials);
-        } else {
-            const el = document.createElement('textarea');
-            el.className = 'prompt-input';
-            el.placeholder = `Describe what to ${mode}...`;
-            promptControlsContainer.appendChild(el);
-        }
-        updateGenerateButtonState();
-    }
-    function handleCategoryChange() { const namesContainer = getEl('object-names-container'); namesContainer.innerHTML = ''; const categoryType = getEl('category-type').dataset.value; if (categoryType && PROMPT_DATA.categories[categoryType]) { const headingText = categoryType.charAt(0).toUpperCase() + categoryType.slice(1); createHeading(namesContainer, 'fa-pen-to-square', `Edit Object Names (${headingText})`); PROMPT_DATA.categories[categoryType].forEach(control => { createCustomDropdown(control, updateGenerateButtonState, namesContainer, `Select ${control.label}...`); }); } updateGenerateButtonState(); }
-    function createHeading(parent, icon, text) { const heading = document.createElement('div'); heading.className = 'control-heading'; heading.innerHTML = `<i class="fa-solid ${icon}"></i><span>${text}</span>`; parent.appendChild(heading); }
-    function handleTabSwitch(e) { const tab = e.target.closest('.prompt-tab'); if (!tab) return; promptTabs.querySelector('.active')?.classList.remove('active'); tab.classList.add('active'); renderPromptControls(tab.dataset.mode); generateBtn.textContent = tab.dataset.mode === 'remove' ? 'Remove' : 'Generate'; }
-    function createCustomDropdown(control, onChangeCallback, parent, defaultText = "Select...") { const container = document.createElement('div'); container.className = 'custom-select-container'; container.id = control.id; const selectedDisplay = document.createElement('div'); selectedDisplay.className = 'select-selected'; selectedDisplay.innerHTML = `<span>${defaultText}</span>`; const optionsContainer = document.createElement('div'); optionsContainer.className = 'select-items select-hide'; Object.entries(control.options).forEach(([value, iconClass]) => { const option = document.createElement('div'); option.innerHTML = `<i class="fa-solid ${iconClass}"></i><span>${value.replace(/-/g, ' ')}</span>`; option.addEventListener("click", function() { selectedDisplay.innerHTML = this.innerHTML; container.dataset.value = value; this.parentNode.previousSibling.click(); if(onChangeCallback) onChangeCallback(); }); optionsContainer.appendChild(option); }); container.append(selectedDisplay, optionsContainer); parent.appendChild(container); selectedDisplay.addEventListener("click", function(e) { e.stopPropagation(); closeAllSelect(this); this.nextSibling.classList.toggle("select-hide"); this.classList.toggle("select-arrow-active"); }); }
-    function closeAllSelect(elmnt) { let x = document.getElementsByClassName("select-items"); let y = document.getElementsByClassName("select-selected"); for (let i = 0; i < y.length; i++) { if (elmnt != y[i]) y[i].classList.remove("select-arrow-active"); } for (let i = 0; i < x.length; i++) { if (elmnt != y[i]) x[i].classList.add("select-hide"); } }
 
-    function renderLayerPanel() { layerListContainer.innerHTML = ''; state.layers.forEach(layer => { const layerEl = document.createElement('div'); layerEl.className = `layer-item ${layer.id === state.activeLayerId ? 'active' : ''}`; if (layer.id === 0) layerEl.classList.add('base-layer'); layerEl.innerHTML = `<span class="visibility-toggle" data-id="${layer.id}"><i data-feather="${layer.isVisible ? 'eye' : 'eye-off'}"></i></span><span class="layer-name">${layer.name}</span>`; layerListContainer.appendChild(layerEl); layerEl.onclick = () => { if (layer.id !== 0) { setActiveLayer(layer.id); }}; }); feather.replace(); layerListContainer.querySelectorAll('.visibility-toggle').forEach(toggle => { toggle.onclick = (e) => { e.stopPropagation(); toggleLayerVisibility(toggle.dataset.id); }; }); }
-    function setActiveLayer(layerId) { state.activeLayerId = parseInt(layerId); renderLayerPanel(); }
-    function toggleLayerVisibility(layerId) { const layer = state.layers.find(l => l.id == layerId); if (layer) { layer.isVisible = !layer.isVisible; renderAllLayers(); renderLayerPanel(); } }
-    function addNewLayer(name, canvas, isBase = false) { const newLayer = { id: isBase ? 0 : Date.now(), name, isVisible: true, canvas }; if(isBase) {state.layers.unshift(newLayer);} else {state.layers.push(newLayer);} state.activeLayerId = newLayer.id; renderLayerPanel(); if(!isBase) saveState(); }
-    function saveState() { const layerData = state.layers.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.history = state.history.slice(0, state.historyIndex + 1); state.history.push(layerData); state.historyIndex = state.history.length - 1; updateUndoRedoButtons(); }
-    function cloneCanvas(oldCanvas) { const newCanvas = document.createElement('canvas'); newCanvas.width = oldCanvas.width; newCanvas.height = oldCanvas.height; newCanvas.getContext('2d').drawImage(oldCanvas, 0, 0); return newCanvas; }
-    function undo() { if (state.historyIndex > 0) { state.historyIndex--; const oldState = state.history[state.historyIndex]; state.layers = oldState.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.activeLayerId = state.layers.length > 1 ? state.layers[state.layers.length-1]?.id : 0; renderAllLayers(); renderLayerPanel(); updateUndoRedoButtons(); } }
-    function redo() { if (state.historyIndex < state.history.length - 1) { state.historyIndex++; const newState = state.history[state.historyIndex]; state.layers = newState.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.activeLayerId = state.layers.length > 1 ? state.layers[state.layers.length-1].id : 0; renderAllLayers(); renderLayerPanel(); updateUndoRedoButtons(); } }
-    function updateUndoRedoButtons() { toolList.querySelector('[data-tool="undo"]').disabled = state.historyIndex <= 0; toolList.querySelector('[data-tool="redo"]').disabled = state.historyIndex >= state.history.length - 1; }
-    function handleImageUpload(e) { const file = e.target.files[0]; if (!file) return; showLoader(() => {}, 2000, "Analyzing Image..."); const reader = new FileReader(); reader.onload = (event) => { resetAllState(); state.image = new Image(); state.image.src = event.target.result; state.image.onload = () => { createImageAndCanvas(); uploadContainer.style.display = 'none'; }; }; reader.readAsDataURL(file); }
-    function createImageAndCanvas() { state.imageContainer = document.createElement('div'); state.imageContainer.className = 'image-container'; state.interactionCanvas = document.createElement('canvas'); state.interactionCanvas.className = 'interaction-canvas'; state.ctx = state.interactionCanvas.getContext('2d', { willReadFrequently: true }); state.imageContainer.appendChild(state.interactionCanvas); canvasArea.appendChild(state.imageContainer); const emptyRoomBtn = document.createElement('button'); emptyRoomBtn.className = 'empty-room-btn'; emptyRoomBtn.textContent = 'Empty Room'; emptyRoomBtn.onclick = handleEmptyRoom; state.imageContainer.appendChild(emptyRoomBtn); syncCanvasAndContainerSize(); createResizeHandles(); const baseCanvas = document.createElement('canvas'); baseCanvas.width = state.image.naturalWidth; baseCanvas.height = state.image.naturalHeight; baseCanvas.getContext('2d').drawImage(state.image, 0, 0); addNewLayer('Base', baseCanvas, true); state.activeLayerId = 0; renderAllLayers(); renderLayerPanel(); saveState(); setActiveTool('brush'); renderPromptControls('add'); }
-    function syncCanvasAndContainerSize() { if (!state.image) return; const canvasAreaRect = canvasArea.getBoundingClientRect(); const maxW = canvasAreaRect.width * 0.8; const maxH = canvasAreaRect.height * 0.8; const imgAspectRatio = state.image.naturalWidth / state.image.naturalHeight; let w = state.image.naturalWidth; let h = state.image.naturalHeight; if (w > maxW) { w = maxW; h = w / imgAspectRatio; } if (h > maxH) { h = maxH; w = h * imgAspectRatio; } state.imageContainer.style.width = `${w}px`; state.imageContainer.style.height = `${h}px`; state.interactionCanvas.width = w; state.interactionCanvas.height = h; }
-    function resetAllState() { if (state.imageContainer) state.imageContainer.remove(); canvasArea.appendChild(uploadContainer); uploadContainer.style.display = 'flex'; state = { ...state, layers: [], history: [], historyIndex: -1, image: null, isMaskDrawn: false, zoomLevel: 1, activeLayerId: null }; renderLayerPanel(); updateUndoRedoButtons(); renderPromptControls('add'); }
-    function renderAllLayers() { if (!state.interactionCanvas || !state.layers.length) return; state.ctx.clearRect(0, 0, state.interactionCanvas.width, state.interactionCanvas.height); state.layers.forEach(layer => { if (layer.isVisible) { state.ctx.drawImage(layer.canvas, 0, 0, state.interactionCanvas.width, state.interactionCanvas.height); } }); }
-    function handleToolChange(e) { const toolBtn = e.target.closest('.tool-btn'); if (!toolBtn || toolBtn.disabled) return; const toolName = toolBtn.dataset.tool; if (toolName === 'reset') { resetAllState(); } else if (toolName === 'undo') { undo(); } else if (toolName === 'redo') { redo(); } else if (toolName === 'zoom-in') { handleZoom(1.1); } else if (toolName === 'zoom-out') { handleZoom(0.9); } else { setActiveTool(toolName); } }
-    function setActiveTool(toolName) { state.activeTool = toolName; toolList.querySelector('.active')?.classList.remove('active'); const newActiveBtn = toolList.querySelector(`[data-tool="${toolName}"]`); if (newActiveBtn) newActiveBtn.classList.add('active'); if (state.imageContainer) { state.imageContainer.className = `image-container tool-${toolName}`; const toolActions = { brush: startDrawing, eraser: startErasing, pan: startPanning }; state.interactionCanvas.onmousedown = toolActions[state.activeTool] || null; } }
-    function handleKeyboardShortcuts(e) { if (e.target.closest('#prompt-controls-container')) return; if (e.key === 'Enter') { e.preventDefault(); generateBtn.click(); } const keyMap = { b: 'brush', e: 'eraser', h: 'pan' }; if (keyMap[e.key]) setActiveTool(keyMap[e.key]); if (e.key === ' ') { e.preventDefault(); if (state.activeTool !== 'pan') { setActiveTool('pan'); } } if (e.key === '+' || e.key === '=') handleZoom(1.1); if (e.key === '-') handleZoom(0.9); if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); } if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'Z' && e.shiftKey))) { e.preventDefault(); redo(); } }
-    function handleZoom(factor) { if (!state.image) return; state.zoomLevel *= factor; state.imageContainer.style.transform = `scale(${state.zoomLevel})`; }
-    function startPanning(e) { let isPanning = true; state.imageContainer.classList.add('is-panning'); let panStart = { x: e.clientX, y: e.clientY }; let containerStart = { x: state.imageContainer.offsetLeft, y: state.imageContainer.offsetTop }; const doPanning = (e) => { if (!isPanning) return; const dx = e.clientX - panStart.x; const dy = e.clientY - panStart.y; state.imageContainer.style.left = `${containerStart.x + dx}px`; state.imageContainer.style.top = `${containerStart.y + dy}px`; }; const stopPanning = () => { isPanning = false; state.imageContainer.classList.remove('is-panning'); document.removeEventListener('mousemove', doPanning); document.removeEventListener('mouseup', stopPanning); }; document.addEventListener('mousemove', doPanning); document.addEventListener('mouseup', stopPanning); }
-    function createResizeHandles() { ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach(pos => { const handle = document.createElement('div'); handle.className = `resize-handle ${pos}`; state.imageContainer.appendChild(handle); handle.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); const startWidth = state.imageContainer.offsetWidth; const startHeight = state.imageContainer.offsetHeight; const startX = e.clientX; const aspectRatio = startWidth / startHeight; const onMouseMove = (e) => { let newWidth = startWidth + ((pos.includes('right') ? 1 : -1) * (e.clientX - startX)); if (newWidth < 50) newWidth = 50; state.imageContainer.style.width = `${newWidth}px`; state.imageContainer.style.height = `${newWidth / aspectRatio}px`; state.interactionCanvas.width = newWidth; state.interactionCanvas.height = newWidth / aspectRatio; renderAllLayers(); }; const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }; document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp); }); }); }
-    function startDrawing(e) { state.isDrawing = true; state.isMaskDrawn = false; state.ctx.clearRect(0, 0, state.interactionCanvas.width, state.interactionCanvas.height); state.ctx.beginPath(); state.ctx.moveTo(e.offsetX, e.offsetY); state.interactionCanvas.onmousemove = doDrawing; state.interactionCanvas.onmouseup = stopDrawing; state.interactionCanvas.onmouseleave = stopDrawing; }
-    function doDrawing(e) { if (!state.isDrawing) return; state.ctx.lineWidth = 35; state.ctx.lineCap = 'round'; state.ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)'; state.ctx.lineTo(e.offsetX, e.offsetY); state.ctx.stroke(); }
-    function stopDrawing() { state.isDrawing = false; state.isMaskDrawn = true; updateGenerateButtonState(); state.interactionCanvas.onmousemove = null; }
-    function startErasing(e) { let activeLayer = state.layers.find(l => l.id === state.activeLayerId); if (!activeLayer || activeLayer.id === 0) { const topLayer = [...state.layers].reverse().find(l => l.isVisible && l.id !== 0); if(topLayer) { setActiveLayer(topLayer.id); activeLayer = topLayer; } else { return; } } state.isDrawing = true; const layerCtx = activeLayer.canvas.getContext('2d'); const erase = (e) => { if(!state.isDrawing) return; const scaleX = activeLayer.canvas.width / state.interactionCanvas.width; const scaleY = activeLayer.canvas.height / state.interactionCanvas.height; layerCtx.clearRect(e.offsetX * scaleX - (20 * scaleX / 2), e.offsetY * scaleY - (20 * scaleY / 2), 20 * scaleX, 20 * scaleY); renderAllLayers(); }; erase(e); state.interactionCanvas.onmousemove = erase; const stopErasing = () => { state.isDrawing = false; saveState(); state.interactionCanvas.onmousemove = null; state.interactionCanvas.onmouseup = null; state.interactionCanvas.onmouseleave = null; }; state.interactionCanvas.onmouseup = stopErasing; state.interactionCanvas.onmouseleave = stopErasing; }
-    function updateGenerateButtonState() { const activeMode = promptTabs.querySelector('.active')?.dataset.mode; const hasMask = state.isMaskDrawn && state.image; let canGenerate = false; if (activeMode === 'add') { const selects = promptControlsContainer.querySelectorAll('.custom-select-container'); canGenerate = hasMask && Array.from(selects).some(s => s.dataset.value && s.dataset.value !== 'Select...'); } else if (activeMode === 'change') { const promptText = promptControlsContainer.querySelector('textarea')?.value; canGenerate = hasMask && promptText && promptText.trim(); } else if (activeMode === 'remove') { canGenerate = hasMask; } generateBtn.disabled = !canGenerate; }
-    function showLoader(onComplete, duration = 3000, text = "Processing...") { const loader = document.createElement('div'); loader.className = 'loader-overlay'; loader.innerHTML = `<div class="loader-text">${text} <span id="progress-percent">0%</span></div><div class="progress-bar-container"><div id="progress-bar" class="progress-bar"></div></div>`; (state.imageContainer || canvasArea).appendChild(loader); let progress = 0; const intervalTime = duration / 50; const interval = setInterval(() => { progress += 2; getEl('progress-percent').textContent = `${Math.min(100, Math.round(progress))}%`; getEl('progress-bar').style.width = `${Math.min(100, progress)}%`; if (progress >= 100) { clearInterval(interval); onComplete(); loader.remove(); } }, intervalTime); }
-    async function handleEmptyRoom() { /* ... function implementation is correct from previous version ... */ }
-    async function handleGeneration(overridePrompt = null) {
-        if (generateBtn.disabled && !overridePrompt) return;
+    // --- HISTORY (UNDO/REDO) ---
+    function saveState() {
+        if (!state.baseCanvas) return;
+        const imageData = state.baseCanvas.getContext('2d').getImageData(0, 0, state.baseCanvas.width, state.baseCanvas.height);
+        state.history = state.history.slice(0, state.historyIndex + 1);
+        state.history.push(imageData);
+        state.historyIndex = state.history.length - 1;
+        updateUndoRedoButtons();
+    }
+
+    function undo() {
+        if (state.historyIndex > 0) {
+            state.historyIndex--;
+            state.baseCanvas.getContext('2d').putImageData(state.history[state.historyIndex], 0, 0);
+            updateUndoRedoButtons();
+        }
+    }
+
+    function redo() {
+        if (state.historyIndex < state.history.length - 1) {
+            state.historyIndex++;
+            state.baseCanvas.getContext('2d').putImageData(state.history[state.historyIndex], 0, 0);
+            updateUndoRedoButtons();
+        }
+    }
+
+    function updateUndoRedoButtons() {
+        toolList.querySelector('[data-tool="undo"]').disabled = state.historyIndex <= 0;
+        toolList.querySelector('[data-tool="redo"]').disabled = state.historyIndex >= state.history.length - 1;
+    }
+
+    // --- IMAGE & CANVAS HANDLING ---
+    function handleImageUpload(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { resetAllState(); state.image = new Image(); state.image.src = event.target.result; state.image.onload = () => { createImageAndCanvas(); uploadContainer.style.display = 'none'; }; }; reader.readAsDataURL(file); }
+
+    function createImageAndCanvas() {
+        state.imageContainer = document.createElement('div');
+        state.imageContainer.className = 'image-container';
+        
+        state.baseCanvas = document.createElement('canvas');
+        state.baseCanvas.id = 'base-canvas';
+        
+        state.drawCanvas = document.createElement('canvas');
+        state.drawCanvas.id = 'draw-canvas';
+        state.drawCtx = state.drawCanvas.getContext('2d', { willReadFrequently: true });
+        
+        state.imageContainer.append(state.baseCanvas, state.drawCanvas);
+        canvasArea.appendChild(state.imageContainer);
+        
+        syncCanvasAndContainerSize();
+        
+        const baseCtx = state.baseCanvas.getContext('2d');
+        baseCtx.drawImage(state.image, 0, 0, state.baseCanvas.width, state.baseCanvas.height);
+        
+        saveState(); // Save initial state for undo
+        setActiveTool('brush');
+    }
+
+    function syncCanvasAndContainerSize() {
+        if (!state.image) return;
+        const canvasAreaRect = canvasArea.getBoundingClientRect();
+        const maxW = canvasAreaRect.width * 0.9;
+        const maxH = canvasAreaRect.height * 0.9;
+        const imgAspectRatio = state.image.naturalWidth / state.image.naturalHeight;
+        let w = state.image.naturalWidth;
+        let h = state.image.naturalHeight;
+        if (w > maxW) { w = maxW; h = w / imgAspectRatio; }
+        if (h > maxH) { h = maxH; w = h * imgAspectRatio; }
+        [state.imageContainer, state.baseCanvas, state.drawCanvas].forEach(el => {
+            el.style.width = `${w}px`;
+            el.style.height = `${h}px`;
+            if (el.tagName === 'CANVAS') {
+                el.width = state.image.naturalWidth > 1024 ? 1024 : state.image.naturalWidth;
+                el.height = state.image.naturalHeight > 1024 ? 1024 : state.image.naturalHeight;
+            }
+        });
+        if (state.baseCanvas.getContext('2d')) {
+             state.baseCanvas.getContext('2d').drawImage(state.image, 0, 0, state.baseCanvas.width, state.baseCanvas.height);
+        }
+    }
+
+    function resetAllState() { if (state.imageContainer) state.imageContainer.remove(); canvasArea.appendChild(uploadContainer); uploadContainer.style.display = 'flex'; state = { ...state, image: null, isMaskDrawn: false, history: [], historyIndex: -1 }; updateUndoRedoButtons(); }
+
+    // --- TOOL & INTERACTION LOGIC ---
+    function handleToolChange(e) { const toolBtn = e.target.closest('.tool-btn'); if (!toolBtn) return; const toolName = toolBtn.dataset.tool; if (toolName === 'reset') { resetAllState(); } else if (toolName === 'undo') { undo(); } else if (toolName === 'redo') { redo(); } else { setActiveTool(toolName); } }
+    function setActiveTool(toolName) { state.activeTool = toolName; toolList.querySelector('.active')?.classList.remove('active'); const newActiveBtn = toolList.querySelector(`[data-tool="${toolName}"]`); if (newActiveBtn) newActiveBtn.classList.add('active'); if (state.imageContainer) { state.imageContainer.className = `image-container tool-${toolName}`; state.drawCanvas.onmousedown = { brush: startDrawing, eraser: startErasing, pan: startPanning }[state.activeTool] || null; } }
+    function handleKeyboardShortcuts(e) { if (e.target.tagName === 'TEXTAREA') return; const keyMap = { b: 'brush', e: 'eraser', h: 'pan' }; if (keyMap[e.key]) setActiveTool(keyMap[e.key]); if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); } if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); } }
+    function startPanning(e) { let panStart = { x: e.clientX, y: e.clientY }; let containerStart = { x: state.imageContainer.offsetLeft, y: state.imageContainer.offsetTop }; const doPanning = (e) => { const dx = e.clientX - panStart.x; const dy = e.clientY - panStart.y; state.imageContainer.style.left = `${containerStart.x + dx}px`; state.imageContainer.style.top = `${containerStart.y + dy}px`; }; const stopPanning = () => { document.removeEventListener('mousemove', doPanning); document.removeEventListener('mouseup', stopPanning); }; document.addEventListener('mousemove', doPanning); document.addEventListener('mouseup', stopPanning); }
+
+    // --- DRAWING, ERASING & GENERATION ---
+    function startDrawing(e) { state.isDrawing = true; state.isMaskDrawn = false; state.drawCtx.clearRect(0, 0, state.drawCanvas.width, state.drawCanvas.height); state.drawCtx.beginPath(); state.drawCtx.moveTo(e.offsetX * (state.drawCanvas.width / state.drawCanvas.offsetWidth), e.offsetY * (state.drawCanvas.height / state.drawCanvas.offsetHeight)); state.drawCanvas.onmousemove = doDrawing; state.drawCanvas.onmouseup = stopDrawing; }
+    function doDrawing(e) { if (!state.isDrawing) return; state.drawCtx.lineWidth = 60; state.drawCtx.lineCap = 'round'; state.drawCtx.strokeStyle = 'rgba(0,0,0,1)'; state.drawCtx.lineTo(e.offsetX * (state.drawCanvas.width / state.drawCanvas.offsetWidth), e.offsetY * (state.drawCanvas.height / state.drawCanvas.offsetHeight)); state.drawCtx.stroke(); }
+    function stopDrawing() { state.isDrawing = false; state.isMaskDrawn = true; updateGenerateButtonState(); state.drawCanvas.onmousemove = null; }
+
+    function startErasing(e) { state.isDrawing = true; const erase = (e) => { if (!state.isDrawing) return; const x = e.offsetX * (state.baseCanvas.width / state.baseCanvas.offsetWidth); const y = e.offsetY * (state.baseCanvas.height / state.baseCanvas.offsetHeight); state.baseCanvas.getContext('2d').globalCompositeOperation = 'destination-out'; state.baseCanvas.getContext('2d').beginPath(); state.baseCanvas.getContext('2d').arc(x, y, 30, 0, Math.PI * 2); state.baseCanvas.getContext('2d').fill(); }; erase(e); state.drawCanvas.onmousemove = erase; state.drawCanvas.onmouseup = () => { state.isDrawing = false; state.baseCanvas.getContext('2d').globalCompositeOperation = 'source-over'; saveState(); state.drawCanvas.onmousemove = null; }; }
+    
+    function updateGenerateButtonState() { generateBtn.disabled = !state.isMaskDrawn || !promptInput.value.trim(); }
+    
+    function showLoader(onComplete) {
+        const loader = document.createElement('div');
+        loader.className = 'loader-overlay';
+        loader.innerHTML = `<div class="loader-text">Contacting DALL-E... <span id="progress-percent">0%</span></div><div class="progress-bar-container"><div id="progress-bar" class="progress-bar"></div></div>`;
+        (state.imageContainer || canvasArea).appendChild(loader);
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 2;
+            getEl('progress-percent').textContent = `${Math.round(progress)}%`;
+            getEl('progress-bar').style.width = `${progress}%`;
+            if (progress >= 100) { clearInterval(interval); onComplete(); loader.remove(); }
+        }, 120);
+    }
+
+    function getApiKey() { if (!state.apiKey) { state.apiKey = prompt("Please enter your OpenAI API key to proceed:"); } return state.apiKey; }
+
+    async function handleGeneration() {
+        if (generateBtn.disabled) return;
+        const apiKey = getApiKey();
+        if (!apiKey) return;
+
         generateBtn.disabled = true;
         showLoader(async () => {
             try {
+                // This is the crucial part: create a temporary canvas for the mask
+                const maskBlob = await new Promise(resolve => state.drawCanvas.toBlob(resolve, 'image/png'));
+                const originalImageBlob = await new Promise(resolve => state.baseCanvas.toBlob(resolve, 'image/png'));
+
                 const formData = new FormData();
-                const mode = overridePrompt ? 'remove' : promptTabs.querySelector('.active').dataset.mode;
-                const compositeCanvas = document.createElement('canvas');
-                compositeCanvas.width = state.image.naturalWidth;
-                compositeCanvas.height = state.image.naturalHeight;
-                const compositeCtx = compositeCanvas.getContext('2d');
-                const layersToComposite = (mode === 'change' || mode === 'remove') && state.activeLayerId !== 0
-                    ? state.layers.filter(l => l.id !== state.activeLayerId)
-                    : state.layers;
-                layersToComposite.forEach(layer => { if (layer.isVisible) { compositeCtx.drawImage(layer.canvas, 0, 0); } });
-                const imageBlob = await new Promise(res => compositeCanvas.toBlob(res, 'image/png'));
-                const maskCanvas = document.createElement('canvas');
-                maskCanvas.width = state.image.naturalWidth;
-                maskCanvas.height = state.image.naturalHeight;
-                maskCanvas.getContext('2d').drawImage(state.interactionCanvas, 0, 0, maskCanvas.width, maskCanvas.height);
-                const maskBlob = await new Promise(res => maskCanvas.toBlob(res, 'image/png'));
-                formData.append('image', imageBlob, 'original.png');
-                formData.append('mask', maskBlob, 'mask.png');
-                let finalPrompt, layerName;
-                if (overridePrompt) { finalPrompt = overridePrompt; layerName = "Empty Room"; }
-                else if (mode === 'remove') { finalPrompt = "remove the selected object and fill with a realistic background that matches the surrounding"; layerName = "Removal"; } 
-                else if (mode === 'change') { finalPrompt = promptControlsContainer.querySelector('textarea').value; layerName = finalPrompt.substring(0, 20); } 
-                else { const selects = promptControlsContainer.querySelectorAll('.custom-select-container'); layerName = Array.from(selects).map(s => s.dataset.value).filter(Boolean).filter(v => v !== 'Select...').join(', '); finalPrompt = `A realistic, high quality photo of ${layerName} in the selected area, fitting the style and lighting of the scene`; }
-                formData.append('prompt', finalPrompt);
-                const response = await fetch('http://localhost:3001/generate-image', { method: 'POST', body: formData });
-                if (!response.ok) { const error = await response.json(); throw new Error(error.message || 'Server error'); }
+                formData.append('image', originalImageBlob);
+                formData.append('mask', maskBlob);
+                formData.append('prompt', promptInput.value);
+                formData.append('n', 1);
+                formData.append('size', '1024x1024');
+
+                // Using a CORS proxy to bypass browser restrictions for this demo.
+                // In a real app, this API call should be made from a server.
+                const response = await fetch("https://cors-anywhere.herokuapp.com/https://api.openai.com/v1/images/edits", {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error.message || 'Server returned an error');
+                }
+                
                 const data = await response.json();
                 const resultImg = new Image();
                 resultImg.crossOrigin = 'Anonymous';
                 resultImg.onload = () => {
-                    const newContentCanvas = document.createElement('canvas');
-                    newContentCanvas.width = state.image.naturalWidth;
-                    newContentCanvas.height = state.image.naturalHeight;
-                    newContentCanvas.getContext('2d').drawImage(resultImg, 0, 0);
-                    if (overridePrompt) { state.layers = state.layers.filter(l => l.id === 0); state.layers[0].canvas = newContentCanvas; saveState(); } 
-                    else {
-                        const finalLayerCanvas = document.createElement('canvas');
-                        finalLayerCanvas.width = state.image.naturalWidth;
-                        finalLayerCanvas.height = state.image.naturalHeight;
-                        const finalCtx = finalLayerCanvas.getContext('2d');
-                        finalCtx.drawImage(newContentCanvas, 0, 0);
-                        if(mode !== 'change'){
-                            finalCtx.globalCompositeOperation = 'destination-in';
-                            finalCtx.drawImage(state.interactionCanvas, 0, 0, finalLayerCanvas.width, finalLayerCanvas.height);
-                        }
-                        addNewLayer(layerName || 'Edit', finalLayerCanvas);
-                    }
-                    renderAllLayers();
+                    const baseCtx = state.baseCanvas.getContext('2d');
+                    baseCtx.drawImage(resultImg, 0, 0, state.baseCanvas.width, state.baseCanvas.height);
+                    saveState(); // Save the final result
                 };
-                resultImg.src = data.url;
-            } catch (error) { console.error("Generation failed:", error); alert(`Image generation failed: ${error.message}`);
-            } finally { state.isMaskDrawn = false; updateGenerateButtonState(); }
-        }, 12000, "Contacting DALL-E...");
+                resultImg.src = data.data[0].url;
+
+            } catch (error) {
+                console.error("Generation failed:", error);
+                alert(`Image generation failed: ${error.message}. You may need to enable the CORS proxy demo at https://cors-anywhere.herokuapp.com/corsdemo`);
+            } finally {
+                state.isMaskDrawn = false;
+                state.drawCtx.clearRect(0, 0, state.drawCanvas.width, state.drawCanvas.height);
+                updateGenerateButtonState();
+            }
+        });
     }
 });

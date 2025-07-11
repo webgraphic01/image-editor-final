@@ -50,29 +50,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderPromptControls(mode) {
         promptControlsContainer.innerHTML = '';
         promptControlsContainer.oninput = updateGenerateButtonState;
-        
         if (mode === 'add') {
             const createSection = (data) => {
                 createHeading(promptControlsContainer, data.icon, data.label);
-                createCustomDropdown(data, updateGenerateButtonState, promptControlsContainer, `Select...`);
+                createCustomDropdown(data, updateGenerateButtonState, promptControlsContainer);
             };
-
             createSection(PROMPT_DATA.materials);
-            
             createHeading(promptControlsContainer, 'fa-box', 'Edit Object Categories');
             createCustomDropdown({ id: 'category-type', options: {'Select...': 'fa-question-circle', 'interior': 'fa-house-chimney', 'exterior': 'fa-road'} }, handleCategoryChange, promptControlsContainer, "Select Category...");
-            
             const namesContainer = document.createElement('div');
             namesContainer.id = 'object-names-container';
             promptControlsContainer.appendChild(namesContainer);
-
             createSection(PROMPT_DATA.interiorTypes);
             createSection(PROMPT_DATA.stagingTypes);
             createSection(PROMPT_DATA.stagingStyles);
             createSection(PROMPT_DATA.interiorStyles);
             createSection(PROMPT_DATA.interiorColors);
             createSection(PROMPT_DATA.architecturalMaterials);
-
         } else {
             const el = document.createElement('textarea');
             el.className = 'prompt-input';
@@ -93,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function addNewLayer(name, canvas, isBase = false) { const newLayer = { id: isBase ? 0 : Date.now(), name, isVisible: true, canvas }; if(isBase) {state.layers.unshift(newLayer);} else {state.layers.push(newLayer);} state.activeLayerId = newLayer.id; renderLayerPanel(); if(!isBase) saveState(); }
     function saveState() { const layerData = state.layers.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.history = state.history.slice(0, state.historyIndex + 1); state.history.push(layerData); state.historyIndex = state.history.length - 1; updateUndoRedoButtons(); }
     function cloneCanvas(oldCanvas) { const newCanvas = document.createElement('canvas'); newCanvas.width = oldCanvas.width; newCanvas.height = oldCanvas.height; newCanvas.getContext('2d').drawImage(oldCanvas, 0, 0); return newCanvas; }
-    function undo() { if (state.historyIndex > 0) { state.historyIndex--; const oldState = state.history[state.historyIndex]; state.layers = oldState.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.activeLayerId = state.layers.length > 1 ? state.layers[state.layers.length-1].id : 0; renderAllLayers(); renderLayerPanel(); updateUndoRedoButtons(); } }
+    function undo() { if (state.historyIndex > 0) { state.historyIndex--; const oldState = state.history[state.historyIndex]; state.layers = oldState.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.activeLayerId = state.layers.length > 1 ? state.layers[state.layers.length-1]?.id : 0; renderAllLayers(); renderLayerPanel(); updateUndoRedoButtons(); } }
     function redo() { if (state.historyIndex < state.history.length - 1) { state.historyIndex++; const newState = state.history[state.historyIndex]; state.layers = newState.map(l => ({...l, canvas: cloneCanvas(l.canvas)})); state.activeLayerId = state.layers.length > 1 ? state.layers[state.layers.length-1].id : 0; renderAllLayers(); renderLayerPanel(); updateUndoRedoButtons(); } }
     function updateUndoRedoButtons() { toolList.querySelector('[data-tool="undo"]').disabled = state.historyIndex <= 0; toolList.querySelector('[data-tool="redo"]').disabled = state.historyIndex >= state.history.length - 1; }
     function handleImageUpload(e) { const file = e.target.files[0]; if (!file) return; showLoader(() => {}, 2000, "Analyzing Image..."); const reader = new FileReader(); reader.onload = (event) => { resetAllState(); state.image = new Image(); state.image.src = event.target.result; state.image.onload = () => { createImageAndCanvas(); uploadContainer.style.display = 'none'; }; }; reader.readAsDataURL(file); }
@@ -107,13 +101,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleZoom(factor) { if (!state.image) return; state.zoomLevel *= factor; state.imageContainer.style.transform = `scale(${state.zoomLevel})`; }
     function startPanning(e) { let isPanning = true; state.imageContainer.classList.add('is-panning'); let panStart = { x: e.clientX, y: e.clientY }; let containerStart = { x: state.imageContainer.offsetLeft, y: state.imageContainer.offsetTop }; const doPanning = (e) => { if (!isPanning) return; const dx = e.clientX - panStart.x; const dy = e.clientY - panStart.y; state.imageContainer.style.left = `${containerStart.x + dx}px`; state.imageContainer.style.top = `${containerStart.y + dy}px`; }; const stopPanning = () => { isPanning = false; state.imageContainer.classList.remove('is-panning'); document.removeEventListener('mousemove', doPanning); document.removeEventListener('mouseup', stopPanning); }; document.addEventListener('mousemove', doPanning); document.addEventListener('mouseup', stopPanning); }
     function createResizeHandles() { ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach(pos => { const handle = document.createElement('div'); handle.className = `resize-handle ${pos}`; state.imageContainer.appendChild(handle); handle.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); const startWidth = state.imageContainer.offsetWidth; const startHeight = state.imageContainer.offsetHeight; const startX = e.clientX; const aspectRatio = startWidth / startHeight; const onMouseMove = (e) => { let newWidth = startWidth + ((pos.includes('right') ? 1 : -1) * (e.clientX - startX)); if (newWidth < 50) newWidth = 50; state.imageContainer.style.width = `${newWidth}px`; state.imageContainer.style.height = `${newWidth / aspectRatio}px`; state.interactionCanvas.width = newWidth; state.interactionCanvas.height = newWidth / aspectRatio; renderAllLayers(); }; const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }; document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp); }); }); }
-    function startDrawing(e) { state.isDrawing = true; state.isMaskDrawn = false; state.ctx.clearRect(0, 0, state.interactionCanvas.width, state.interactionCanvas.height); renderAllLayers(); state.ctx.beginPath(); state.ctx.moveTo(e.offsetX, e.offsetY); state.interactionCanvas.onmousemove = doDrawing; state.interactionCanvas.onmouseup = stopDrawing; state.interactionCanvas.onmouseleave = stopDrawing; }
+    function startDrawing(e) { state.isDrawing = true; state.isMaskDrawn = false; state.ctx.clearRect(0, 0, state.interactionCanvas.width, state.interactionCanvas.height); state.ctx.beginPath(); state.ctx.moveTo(e.offsetX, e.offsetY); state.interactionCanvas.onmousemove = doDrawing; state.interactionCanvas.onmouseup = stopDrawing; state.interactionCanvas.onmouseleave = stopDrawing; }
     function doDrawing(e) { if (!state.isDrawing) return; state.ctx.lineWidth = 35; state.ctx.lineCap = 'round'; state.ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)'; state.ctx.lineTo(e.offsetX, e.offsetY); state.ctx.stroke(); }
     function stopDrawing() { state.isDrawing = false; state.isMaskDrawn = true; updateGenerateButtonState(); state.interactionCanvas.onmousemove = null; }
     function startErasing(e) { let activeLayer = state.layers.find(l => l.id === state.activeLayerId); if (!activeLayer || activeLayer.id === 0) { const topLayer = [...state.layers].reverse().find(l => l.isVisible && l.id !== 0); if(topLayer) { setActiveLayer(topLayer.id); activeLayer = topLayer; } else { return; } } state.isDrawing = true; const layerCtx = activeLayer.canvas.getContext('2d'); const erase = (e) => { if(!state.isDrawing) return; const scaleX = activeLayer.canvas.width / state.interactionCanvas.width; const scaleY = activeLayer.canvas.height / state.interactionCanvas.height; layerCtx.clearRect(e.offsetX * scaleX - (20 * scaleX / 2), e.offsetY * scaleY - (20 * scaleY / 2), 20 * scaleX, 20 * scaleY); renderAllLayers(); }; erase(e); state.interactionCanvas.onmousemove = erase; const stopErasing = () => { state.isDrawing = false; saveState(); state.interactionCanvas.onmousemove = null; state.interactionCanvas.onmouseup = null; state.interactionCanvas.onmouseleave = null; }; state.interactionCanvas.onmouseup = stopErasing; state.interactionCanvas.onmouseleave = stopErasing; }
     function updateGenerateButtonState() { const activeMode = promptTabs.querySelector('.active')?.dataset.mode; const hasMask = state.isMaskDrawn && state.image; let canGenerate = false; if (activeMode === 'add') { const selects = promptControlsContainer.querySelectorAll('.custom-select-container'); canGenerate = hasMask && Array.from(selects).some(s => s.dataset.value && s.dataset.value !== 'Select...'); } else if (activeMode === 'change') { const promptText = promptControlsContainer.querySelector('textarea')?.value; canGenerate = hasMask && promptText && promptText.trim(); } else if (activeMode === 'remove') { canGenerate = hasMask; } generateBtn.disabled = !canGenerate; }
     function showLoader(onComplete, duration = 3000, text = "Processing...") { const loader = document.createElement('div'); loader.className = 'loader-overlay'; loader.innerHTML = `<div class="loader-text">${text} <span id="progress-percent">0%</span></div><div class="progress-bar-container"><div id="progress-bar" class="progress-bar"></div></div>`; (state.imageContainer || canvasArea).appendChild(loader); let progress = 0; const intervalTime = duration / 50; const interval = setInterval(() => { progress += 2; getEl('progress-percent').textContent = `${Math.min(100, Math.round(progress))}%`; getEl('progress-bar').style.width = `${Math.min(100, progress)}%`; if (progress >= 100) { clearInterval(interval); onComplete(); loader.remove(); } }, intervalTime); }
-    async function handleEmptyRoom() { /* ... same as before ... */ }
+    async function handleEmptyRoom() { /* ... function implementation is correct from previous version ... */ }
     async function handleGeneration(overridePrompt = null) {
         if (generateBtn.disabled && !overridePrompt) return;
         generateBtn.disabled = true;

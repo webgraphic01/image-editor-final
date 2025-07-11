@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+      {
+        "source": "/api/generate-image",
+        "destination": "/api/server"
+      }
+    ]
+}
